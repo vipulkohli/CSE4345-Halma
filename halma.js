@@ -111,12 +111,23 @@ function isThereAPieceBetween(cell1, cell2) {
     return false;
 }
 
+// Return whether or not the given piece is located in the target finish area.
+function isPieceInTarget(piece) {
+    var startColumn = 6,
+        endColumn = 8,
+        startRow = 0,
+        endRow = 2;
+    if (piece.column >= startColumn && piece.column <= endColumn && 
+        piece.row >= startRow && piece.row <= endRow) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 function isTheGameOver() {
     for (var i = 0; i < gNumPieces; i++) {
-        if (gPieces[i].row > 2) {
-            return false;
-        }
-        if (gPieces[i].column < (kBoardWidth - 3)) {
+        if (!isPieceInTarget(gPieces[i])) {
             return false;
         }
     }
@@ -168,8 +179,13 @@ function drawPiece(p, selected) {
     gDrawingContext.closePath();
     gDrawingContext.strokeStyle = "#000";
     gDrawingContext.stroke();
+    // Color the piece black if selected, color it green if it's in the target area
     if (selected) {
         gDrawingContext.fillStyle = "#000";
+        gDrawingContext.fill();
+    }
+    else if (isPieceInTarget(p)) {
+        gDrawingContext.fillStyle = "#0f0";
         gDrawingContext.fill();
     }
 }
