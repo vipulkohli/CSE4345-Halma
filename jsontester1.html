@@ -137,16 +137,16 @@ function ExecWebService () {
        // note: order must be the same, values must be int or strings
        if (isResultExpected(resultObj, expectedObj) ){
         document.getElementById("resultmsg").innerHTML = "PASS";   
-        document.getElementById("resultmsg").style = "background-color:green";
+        document.getElementById("resultmsg").style.backgroundColor = "green";
        }
        else { // not equivalent
         document.getElementById("resultmsg").innerHTML = "FAIL"; 
-        document.getElementById("resultmsg").style = "background-color:red";
+        document.getElementById("resultmsg").style.backgroundColor = "red";
        }
       }  // end  ok JSON
       else  { // bad JSON - so we can't really compare. FAIL
         document.getElementById("resultmsg").innerHTML = "FAIL"; 
-        document.getElementById("resultmsg").style = "background-color:red"; 
+        document.getElementById("resultmsg").style.backgroundColor = "red"; 
     }
      
       
