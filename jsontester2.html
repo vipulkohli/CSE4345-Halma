@@ -40,12 +40,22 @@ Note: These tests will cycle
 var moveRequests = ["px=10&py=20&dx=30&dy=20&bx=2&by=2", 
                     "px=10&py=20&dx=10&dy=30&bx=2&by=2",
                     "px=10&py=10&dx=30&dy=30&bx=2&by=2",
-                    "px=10&py=10&dx=30&dy=30&bx=11&by=11"
+                    "px=10&py=10&dx=30&dy=30&bx=11&by=11",
+                    "px=1&py=3&dx=1&dy=0&bx=2&by=1", // move up
+                    "px=3&py=4&dx=2&dy=4&bx=3&by=4", // move a negative direction and move onto the destination
+                    "px=-6&py=-3&dx=-6&dy=-6&bx=-6&by=-5", // negative coordinate system
+                    "px=3&py=3&dx=3&dy=5&bx=3&by=4", // jump over a piece and land on destination
+                    "px=2&py=5&dx=4&dy=2&bx=3&by=3" // destination is not in a "straight line" from the piece
                    ]; 
 var expectedMoveData = [ '{"x":11, "y":20}',
                          '{"x":10, "y":21}',
                          '{"x":11, "y":11}',
-                         '{"x":12, "y":12}'
+                         '{"x":12, "y":12}',
+                         '{"x":1, "y":2}',
+                         '{"x":2, "y":4}',
+                         '{"x":-6, "y":-4}',
+                         '{"x":3, "y":5}',
+                         '{"x":3, "y":4}'
                     ];
 var expectedSumData = ['{"sumx":42, "sumy":42}',
                        '{"sumx":22, "sumy":52}',
