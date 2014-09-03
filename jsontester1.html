@@ -1,0 +1,180 @@
+<html>
+<body>
+<h1>Web Service JSON Tester1 -- Adding x & y Values</h1>
+
+<div id="getinfo">
+<p>This JavaScript Web Services Tester Program should be located and executed 
+    from same directory as your web services program 
+    (e.g. your php, python or perl program)</p>
+
+
+<form id="urlname" name="input">
+  Enter the name of your Web Service Program(e.g. xyz.php):
+  <input type="text" id="userUrl" style="width: 200px" 
+         value="api/genJsonSumFromParms"  >
+  <button type="button" onclick="setupWebServiceUrl()">GO</button>
+</form> 
+
+
+<h3><span id="errmsg"> </span></h3>
+</div>
+
+<div id="testarea"  style="display:none">
+<h2 id="testid">Test# appears here</h2>
+
+<h2>Expected Return Value: <span id="jsexpected"></span></h2>
+<h2>Actual Return Value:   <span id="jsresult"></span></h2>
+
+<div id="resultzone">   
+ <h3>RESULT: <span id="resultmsg" style="width: 150px">PASS or FAIL</span></h3>
+</div>
+<button onclick="ExecWebService()">Run Next Test</button> 
+Note: These tests will cycle
+
+</div>
+
+<script>
+   
+//global variables
+
+var moveRequests = ["px=10&py=20&dx=30&dy=20&bx=2&by=2", 
+                    "px=10&py=20&dx=10&dy=30&bx=2&by=2",
+                    "px=10&py=10&dx=30&dy=30&bx=2&by=2",
+                    "px=10&py=10&dx=30&dy=30&bx=11&by=11"
+                   ]; 
+var expectedMoveData = [ '{"x":11, "y":20}',
+                         '{"x":10, "y":21}',
+                         '{"x":11, "y":11}',
+                         '{"x":12, "y":12}'
+                    ];
+var expectedSumData = ['{"sumx":42, "sumy":42}',
+                       '{"sumx":22, "sumy":52}',
+                       '{"sumx":42, "sumy":42}',
+                       '{"sumx":51, "sumy":51}' 
+                      ];       
+
+var expectedData = expectedSumData;  // change for different tests
+
+var requestIdx = 0;   // index into test arrays
+
+function setupWebServiceUrl() {
+    // attempt to communicate with server - display error msg if unable
+    var req = new XMLHttpRequest();
+    var url = document.getElementById("userUrl").value;
+    req.open('GET', url, false);
+    req.onreadystatechange = function(){
+        if (req.readyState === 4){
+          if (req.status === 404) {  
+            var url2 = document.baseURI;
+            var resultUrl = url2.substring(0, url2.lastIndexOf("/") + 1);
+            var msg = "The Program: " + document.getElementById("userUrl").value +
+              " not found at: " + resultUrl;
+            document.getElementById("errmsg").innerHTML = msg;
+          }
+          else {
+              // ready to run tests - reveal test area/hide setup
+              document.getElementById("testarea").style.display = "block";
+              document.getElementById("getinfo").style.display  = "none";
+              // run first text
+              ExecWebService();  // run the first test
+          }
+        }
+       };
+      req.send();
+}
+ 
+
+// Makes an HTTP GET Request to server using parms in array moveRequests
+//  then compares result with values referenced in expectedData
+function ExecWebService () {
+     // set up the server URl with GET parms
+     var url = document.getElementById("userUrl").value + "?" +
+                 moveRequests[requestIdx];
+
+    // display the URL + params     
+    document.getElementById("testid").innerHTML= "Test# " + (requestIdx+1) + 
+            "  " + url;
+    
+    // Expected Data and incoming result SHOLD be JSON
+    // but we need to test for this
+    var isBadJson = false;  // assume until proven otherwise
+    
+    // is expected data really JSON? it should be. if not, display error msg
+    if(IsJson(expectedData[requestIdx])) {
+     document.getElementById("jsexpected").innerHTML=
+            expectedData[requestIdx];
+    }
+    else {
+        document.getElementById("jsexpected").innerHTML=
+            expectedData[requestIdx] + " <-- WARNING: NOT JSON";
+        isBadJson = true;
+    }
+        
+    // make Ajax request
+    var req = new XMLHttpRequest();
+      
+    req.open('GET', url, false);
+    req.send();
+    responseDat=req.responseText;  // server returns this
+    
+    // is server response really JSON?
+    if(IsJson(responseDat))
+     document.getElementById("jsresult").innerHTML=responseDat;
+    else {
+     document.getElementById("jsresult").innerHTML=responseDat + 
+         " <--WARNING - NOT JSON!!";
+     isBadJson = true;
+    }
+      
+      
+      // if we have JSON we can compare JSON answers - red vs green display
+      if (isBadJson===false) {
+       // convert JSON strings into JS objects    
+       var resultObj   = JSON.parse(expectedData[requestIdx]);
+       var expectedObj = JSON.parse(responseDat);
+       
+       // compare expected with actual value - 
+       // note: order must be the same, values must be int or strings
+       if (isResultExpected(resultObj, expectedObj) ){
+        document.getElementById("resultmsg").innerHTML = "PASS";   
+        document.getElementById("resultmsg").style = "background-color:green";
+       }
+       else { // not equivalent
+        document.getElementById("resultmsg").innerHTML = "FAIL"; 
+        document.getElementById("resultmsg").style = "background-color:red";
+       }
+      }  // end  ok JSON
+      else  { // bad JSON - so we can't really compare. FAIL
+        document.getElementById("resultmsg").innerHTML = "FAIL"; 
+        document.getElementById("resultmsg").style = "background-color:red"; 
+    }
+     
+      
+      // set up for next test -- will loop around
+      requestIdx++;
+      if (requestIdx >= moveRequests.length) requestIdx = 0;
+
+    
+}
+
+// converts Objects to JSON strings which are compared
+// takes care of spacing issues that may occur
+function isResultExpected(o1, o2){
+  return JSON.stringify(o1) === JSON.stringify(o2);
+}
+
+// is the string JSON? true or false 
+function IsJson(str) {
+    try {
+        JSON.parse(str);
+    } catch (e) {
+        return false;
+    }
+    return true;
+}
+    
+
+</script>
+
+</body>
+</html>
