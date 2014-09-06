@@ -3,8 +3,11 @@
 require 'Slim/Slim.php';
 $app = new Slim();
 
+// http://yehj.floccul.us/halma/api/genJsonSumFromParms
 $app->get('/genJsonSumFromParms', 'genJsonSumFromParms');
+// http://yehj.floccul.us/halma/api/genJsonMoveFromParms
 $app->get('/genJsonMoveFromParms', 'genJsonMoveFromParms');
+
 $app->run();
 
 // Class to encapsulate X and Y coordinates
