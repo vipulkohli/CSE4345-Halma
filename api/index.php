@@ -7,7 +7,7 @@ $app = new Slim();
 $app->get('/genJsonSumFromParms', 'genJsonSumFromParms');
 // http://yehj.floccul.us/halma/api/genJsonMoveFromParms
 $app->get('/genJsonMoveFromParms', 'genJsonMoveFromParms');
-// http://yehj.floccul.us/halma/api/genJsonMoveFromPixelParms
+// http://yehj.floccul.us/halma/api/genJsonMoveFromPixelParms/{pixelX}/{pixelY}
 $app->get('/genJsonMoveFromPixelParms/:pixelX/:pixelY', 'genJsonMoveFromPixelParms');
 
 $app->run();
