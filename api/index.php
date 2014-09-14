@@ -7,12 +7,19 @@ $app = new Slim();
 $app->get('/genJsonSumFromParms', 'genJsonSumFromParms');
 // http://yehj.floccul.us/halma/api/genJsonMoveFromParms
 $app->get('/genJsonMoveFromParms', 'genJsonMoveFromParms');
+// http://yehj.floccul.us/halma/api/genJsonMoveFromPixelParms
+$app->get('/genJsonMoveFromPixelParms/:pixelX/:pixelY', 'genJsonMoveFromPixelParms');
 
 $app->run();
 
 // Class to encapsulate X and Y coordinates
 class Location {
-    var $x = 0, $y = 0;
+    var $x, $y;
+
+    function Location($x = 0, $y = 0) {
+        $this->x = $x;
+        $this->y = $y;
+    }
 }
 
 /**
@@ -25,11 +32,17 @@ function getLocation($x, $y) {
     $request = Slim::getInstance()->request();
 
     // Create a Location object and store X and Y in it
-    $location = new Location();
-    $location->x = $request->get($x);
-    $location->y = $request->get($y);
+    $location = new Location($request->get($x), $request->get($y));
 
     return $location;
+}
+
+/**
+ * Compares two numbers $a and $b
+ * @return if $a > $b, return 1; if $a < $b, return -1; if $a = $b, return 0
+ */
+function compare($a, $b) {
+    return ($a == $b) ? 0 : (($a > $b) ? 1 : -1);
 }
 
 /**
@@ -86,11 +99,68 @@ function genJsonMoveFromParms() {
 }
 
 /**
- * Compares two numbers $a and $b
- * @return if $a > $b, return 1; if $a < $b, return -1; if $a = $b, return 0
+ * HW 4: Functional Programming Style
  */
-function compare($a, $b) {
-    return ($a == $b) ? 0 : (($a > $b) ? 1 : -1);
+function genJsonMoveFromPixelParms($pixelX, $pixelY) {
+    $numRows = 9;
+    $numCols = 9;
+    $cellPxSize = 50;
+    $destination = new Location(6, 2);
+
+    $location = convertPxToLoc($pixelX, $pixelY, $numRows, $numCols, $cellPxSize);
+    $location = moveToDestination($location, $destination);
+    echo locationToJson($location);
+}
+
+/**
+ * Convert the pixel coordinates to the cell location on the game board
+ * @param $pixelX Pixel X coordinate of where the user clicked on the board
+ * @param $pixelY Pixel Y coordinate of where the user clicked on the board
+ * @param $numRows The number of rows in the game board
+ * @param $numCols The number of columns in the game board
+ * @param $cellPxSize The pixel width/height of a cell in the game board
+ * @return Cell location. NULL if bad parameters.
+ */
+function convertPxToLoc($pixelX, $pixelY, $numRows, $numCols, $cellPxSize) {
+    try {
+        $x = ceil($pixelX / $cellPxSize);
+        $y = ceil($pixelY / $cellPxSize);
+        if (($x < 0 || $x > $numCols - 1) || ($y < 0 || $y > $numRows - 1)) {
+            throw new Exception('Location out of bounds.');
+        }
+        return new Location($x, $y);
+    } catch (Exception $e) {
+        return NULL;
+    }
+}
+
+/**
+ * Move the game piece towards the destination.
+ * @param $location X and Y coordinates of the piece's current location.
+ * @param $destination X and Y coordinates of the destination location.
+ * @return New cell location.
+ */
+function moveToDestination($location, $destination) {
+    if (!$location || !$destination) {
+        return NULL;
+    }
+    $xDiff = $destination->x - $location->x;
+    $yDiff = $destination->y - $location->y;
+    $moveX = compare($xDiff, 0);
+    $moveY = compare($yDiff, 0);
+    return new Location($location->x + $moveX, $location->y + $moveY);
+}
+
+/**
+ * Convert the location to a JSON string.
+ * @param $location X and Y coordinates of a location.
+ * @return JSON string representation of the location.
+ */
+function locationToJson($location) {
+    $x = $location ? $location->x : NULL;
+    $y = $location ? $location->y : NULL;
+    $jsonArray = array('x' => $x, 'y' => $y);
+    return json_encode($jsonArray);
 }
 
 ?>
