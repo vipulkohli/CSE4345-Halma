@@ -106,9 +106,10 @@ function genJsonMoveFromPixelParms($pixelX, $pixelY) {
     $numCols = 9;
     $cellPxSize = 50;
     $destination = new Location(6, 2);
+    $blocker = new Location(4, 4);
 
     $location = convertPxToLoc($pixelX, $pixelY, $numRows, $numCols, $cellPxSize);
-    $location = moveToDestination($location, $destination);
+    $location = moveToDestination($location, $destination, $blocker);
     echo locationToJson($location);
 }
 
@@ -138,17 +139,23 @@ function convertPxToLoc($pixelX, $pixelY, $numRows, $numCols, $cellPxSize) {
  * Move the game piece towards the destination.
  * @param $location X and Y coordinates of the piece's current location.
  * @param $destination X and Y coordinates of the destination location.
+ * @param $destination X and Y coordinates of the destination location.
  * @return New cell location.
  */
-function moveToDestination($location, $destination) {
-    if (!$location || !$destination) {
+function moveToDestination($location, $destination, $blocker) {
+    if (!$location || !$destination || !$blocker) {
         return NULL;
     }
     $xDiff = $destination->x - $location->x;
     $yDiff = $destination->y - $location->y;
     $moveX = compare($xDiff, 0);
     $moveY = compare($yDiff, 0);
-    return new Location($location->x + $moveX, $location->y + $moveY);
+    $newLocation = new Location($location->x + $moveX, $location->y + $moveY);
+    if ($newLocation == $blocker) {
+        $newLocation->x += $moveX;
+        $newLocation->y += $moveY;
+    }
+    return $newLocation;
 }
 
 /**
