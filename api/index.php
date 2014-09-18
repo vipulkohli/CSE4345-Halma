@@ -14,11 +14,19 @@ $app->run();
 
 // Class to encapsulate X and Y coordinates
 class Location {
-    var $x, $y;
+    private $x, $y;
 
     function Location($x = 0, $y = 0) {
         $this->x = $x;
         $this->y = $y;
+    }
+
+    function getX() {
+        return $this->x;
+    }
+
+    function getY() {
+        return $this->y;
     }
 }
 
@@ -57,8 +65,8 @@ function genJsonSumFromParms() {
     $b = getLocation('bx', 'by');
 
     // Calculate sums of x's and y's
-    $sumx = $p->x + $d->x + $b->x;
-    $sumy = $p->y + $d->y + $b->y;
+    $sumx = $p->getX() + $d->getX() + $b->getX();
+    $sumy = $p->getY() + $d->getY() + $b->getY();
 
     // Show answer as a JSON string
     $answer = array('sumx' => $sumx, 'sumy' => $sumy);
@@ -79,27 +87,25 @@ function genJsonMoveFromParms() {
     // Calculate the difference between the X's and Y's of the
     // destination and piece coordinates, and use that to determine
     // the new X and Y coordinates.
-    $xDiff = $d->x - $p->x;
-    $yDiff = $d->y - $p->y;
+    $xDiff = $d->getX() - $p->getX();
+    $yDiff = $d->getY() - $p->getY();
     $moveX = compare($xDiff, 0);
     $moveY = compare($yDiff, 0);
-    $p->x += $moveX;
-    $p->y += $moveY;
+    $newP = new Location($p->getX() + $moveX, $p->getY() + $moveY);
 
     // Check if the new X and Y are on top of the blocking piece.
     // If so, jump over it.
-    if ($p == $b) {
-        $p->x += $moveX;
-        $p->y += $moveY;
+    if ($newP == $b) {
+        $newP = new Location($newP->getX() + $moveX, $newP->getY() + $moveY);
     }
 
     // Show answer as a JSON string
-    $answer = array('x' => $p->x, 'y' => $p->y);
+    $answer = array('x' => $newP->getX(), 'y' => $newP->getY());
     echo json_encode($answer);
 }
 
 /**
- * HW 4: Functional Programming Style
+ * HW 4 & 5: Functional Programming Style
  */
 function genJsonMoveFromPixelParms($pixelX, $pixelY) {
     $numRows = 9;
@@ -108,21 +114,23 @@ function genJsonMoveFromPixelParms($pixelX, $pixelY) {
     $destination = new Location(6, 2);
     $blocker = new Location(4, 4);
 
-    $location = convertPxToLoc($pixelX, $pixelY, $numRows, $numCols, $cellPxSize);
-    $location = moveToDestination($location, $destination, $blocker);
-    echo locationToJson($location);
+    // define partial functions and pass in 'global' variables
+    $convertPxToLoc = partial_function('convertPxToLoc', $numRows, $numCols, $cellPxSize);
+    $moveToDestination = partial_function('moveToDestination', $destination, $blocker);
+
+    echo locationToJson($moveToDestination($convertPxToLoc($pixelX, $pixelY)));
 }
 
 /**
  * Convert the pixel coordinates to the cell location on the game board
- * @param $pixelX Pixel X coordinate of where the user clicked on the board
- * @param $pixelY Pixel Y coordinate of where the user clicked on the board
  * @param $numRows The number of rows in the game board
  * @param $numCols The number of columns in the game board
  * @param $cellPxSize The pixel width/height of a cell in the game board
+ * @param $pixelX Pixel X coordinate of where the user clicked on the board
+ * @param $pixelY Pixel Y coordinate of where the user clicked on the board
  * @return Cell location. NULL if bad parameters.
  */
-function convertPxToLoc($pixelX, $pixelY, $numRows, $numCols, $cellPxSize) {
+function convertPxToLoc($numRows, $numCols, $cellPxSize, $pixelX, $pixelY) {
     try {
         $x = ceil($pixelX / $cellPxSize);
         $y = ceil($pixelY / $cellPxSize);
@@ -137,23 +145,24 @@ function convertPxToLoc($pixelX, $pixelY, $numRows, $numCols, $cellPxSize) {
 
 /**
  * Move the game piece towards the destination.
+ * @param $destination X and Y coordinates of the destination location.
+ * @param $destination X and Y coordinates of the destination location.
  * @param $location X and Y coordinates of the piece's current location.
- * @param $destination X and Y coordinates of the destination location.
- * @param $destination X and Y coordinates of the destination location.
  * @return New cell location.
  */
-function moveToDestination($location, $destination, $blocker) {
+function moveToDestination($destination, $blocker, $location) {
     if (!$location || !$destination || !$blocker) {
         return NULL;
     }
-    $xDiff = $destination->x - $location->x;
-    $yDiff = $destination->y - $location->y;
+    $xDiff = $destination->getX() - $location->getX();
+    $yDiff = $destination->getY() - $location->getY();
     $moveX = compare($xDiff, 0);
     $moveY = compare($yDiff, 0);
-    $newLocation = new Location($location->x + $moveX, $location->y + $moveY);
+    $newLocation = new Location($location->getX() + $moveX, 
+                                $location->getY() + $moveY);
     if ($newLocation == $blocker) {
-        $newLocation->x += $moveX;
-        $newLocation->y += $moveY;
+        $newLocation = new Location($newLocation->getX() + $moveX, 
+                                    $newLocation->getY() + $moveY);
     }
     return $newLocation;
 }
@@ -164,10 +173,20 @@ function moveToDestination($location, $destination, $blocker) {
  * @return JSON string representation of the location.
  */
 function locationToJson($location) {
-    $x = $location ? $location->x : NULL;
-    $y = $location ? $location->y : NULL;
+    $x = $location ? $location->getX() : NULL;
+    $y = $location ? $location->getY() : NULL;
     $jsonArray = array('x' => $x, 'y' => $y);
     return json_encode($jsonArray);
+}
+
+/**
+ * https://gist.github.com/jdp/2201912#file-partial_function-php
+ */
+function partial_function() {
+    $applied_args = func_get_args();
+    return function() use($applied_args) {
+        return call_user_func_array('call_user_func', array_merge($applied_args, func_get_args()));
+    };
 }
 
 ?>
