@@ -242,3 +242,40 @@ function initGame(canvasElement, moveCountElement) {
         newGame();
     }
 }
+
+function encodePiecesAsJson(pieces) {
+    var piecesArray = [];
+    for (var i = 0; i < pieces.length; i++) {
+        var piece = {
+            x: pieces[i].column,
+            y: pieces[i].row
+        };
+        piecesArray.push(piece);
+    }
+    return JSON.stringify(piecesArray);
+}
+
+$(document).ready(function() {
+    $("#nextMove").click(function() {
+        var board = encodePiecesAsJson(gPieces);
+        var upperLeftCell = '{"x":6,"y":0}';
+        var lowerRightCell = '{"x":8,"y":2}';
+        $.ajax({
+            type: "POST",
+            url: "api/getMove",
+            data: { "board": board, 
+                    "upperLeftCell": upperLeftCell, 
+                    "lowerRightCell": lowerRightCell },
+            success: function(move) {
+                move = JSON.parse(move);
+                for (var i = 0; i < gPieces.length; i++) {
+                    if (gPieces[i].column === move[0].x && 
+                        gPieces[i].row === move[0].y) {
+                        clickOnPiece(i);
+                    }
+                }
+                clickOnEmptyCell({"column": move[1].x, "row": move[1].y});
+            }
+        });
+    });
+});
