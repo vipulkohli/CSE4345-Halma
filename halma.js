@@ -268,13 +268,17 @@ $(document).ready(function() {
                     "lowerRightCell": lowerRightCell },
             success: function(move) {
                 move = JSON.parse(move);
+                
                 for (var i = 0; i < gPieces.length; i++) {
-                    if (gPieces[i].column === move[0].x && 
-                        gPieces[i].row === move[0].y) {
+                    if (gPieces[i].column === move.from.x && 
+                        gPieces[i].row === move.from.y) {
                         clickOnPiece(i);
                     }
                 }
-                clickOnEmptyCell({"column": move[1].x, "row": move[1].y});
+
+                for (var i = 0; i < move.to.length; i++) {
+                    clickOnEmptyCell({"column": move.to[i].x, "row": move.to[i].y});
+                }
             }
         });
     });

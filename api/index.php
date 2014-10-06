@@ -16,28 +16,59 @@ $app->run();
 
 // Class to encapsulate X and Y coordinates
 class Cell {
-    private $x, $y, $done;
+    public $x, $y, $done;
 
     function Cell($x = 0, $y = 0, $done = false) {
         $this->x = $x;
         $this->y = $y;
         $this->done = $done;
     }
+}
 
-    function getX() {
-        return $this->x;
+class Path {
+    public $cells = array();
+
+    function Path($start) {
+        $this->addCell($start);
     }
 
-    function getY() {
-        return $this->y;
+    function getLastCell() {
+        return end((array_values($this->cells)));
     }
 
-    function done() {
-        return $this->done;
+    function getFirstCell() {
+        return $this->cells[0];
     }
 
-    function setDone($done) {
-        $this->done = $done;
+    function getPreviousCell() {
+        if (count($this->cells) < 2) {
+            return NULL;
+        } else {
+            return $this->cells[count($this->cells)-2];
+        }
+    }
+
+    function addCell($cell) {
+        array_push($this->cells, $cell);
+    }
+
+    function calcPathDistance() {
+        return distanceBetweenCells($this->getFirstCell(), $this->getLastCell());
+    }
+
+    function calcPathDirection() {
+        $start = $this->getFirstCell();
+        $end = $this->getLastCell();
+        $dy = $end->y - $start->y;
+        $dx = $end->x - $start->x;
+        if ($dx == 0) {
+            if ($dy >= 0) {
+                return 90;
+            } else {
+                return -90;
+            }
+        }
+        return atan($dy/$dx);
     }
 }
 
@@ -76,8 +107,8 @@ function genJsonSumFromParms() {
     $b = getCell('bx', 'by');
 
     // Calculate sums of x's and y's
-    $sumx = $p->getX() + $d->getX() + $b->getX();
-    $sumy = $p->getY() + $d->getY() + $b->getY();
+    $sumx = $p->x + $d->x + $b->x;
+    $sumy = $p->y + $d->y + $b->y;
 
     // Show answer as a JSON string
     $answer = array('sumx' => $sumx, 'sumy' => $sumy);
@@ -98,20 +129,20 @@ function genJsonMoveFromParms() {
     // Calculate the difference between the X's and Y's of the
     // destination and piece coordinates, and use that to determine
     // the new X and Y coordinates.
-    $xDiff = $d->getX() - $p->getX();
-    $yDiff = $d->getY() - $p->getY();
+    $xDiff = $d->x - $p->x;
+    $yDiff = $d->y - $p->y;
     $moveX = compare($xDiff, 0);
     $moveY = compare($yDiff, 0);
-    $newP = new Cell($p->getX() + $moveX, $p->getY() + $moveY);
+    $newP = new Cell($p->x + $moveX, $p->y + $moveY);
 
     // Check if the new X and Y are on top of the blocking piece.
     // If so, jump over it.
     if ($newP == $b) {
-        $newP = new Cell($newP->getX() + $moveX, $newP->getY() + $moveY);
+        $newP = new Cell($newP->x + $moveX, $newP->y + $moveY);
     }
 
     // Show answer as a JSON string
-    $answer = array('x' => $newP->getX(), 'y' => $newP->getY());
+    $answer = array('x' => $newP->x, 'y' => $newP->y);
     echo json_encode($answer);
 }
 
@@ -165,15 +196,15 @@ function moveToDestination($destination, $blocker, $location) {
     if (!$location || !$destination || !$blocker) {
         return NULL;
     }
-    $xDiff = $destination->getX() - $location->getX();
-    $yDiff = $destination->getY() - $location->getY();
+    $xDiff = $destination->x - $location->x;
+    $yDiff = $destination->y - $location->y;
     $moveX = compare($xDiff, 0);
     $moveY = compare($yDiff, 0);
-    $newLocation = new Cell($location->getX() + $moveX, 
-                                $location->getY() + $moveY);
+    $newLocation = new Cell($location->x + $moveX, 
+                                $location->y + $moveY);
     if ($newLocation == $blocker) {
-        $newLocation = new Cell($newLocation->getX() + $moveX, 
-                                    $newLocation->getY() + $moveY);
+        $newLocation = new Cell($newLocation->x + $moveX, 
+                                    $newLocation->y + $moveY);
     }
     return $newLocation;
 }
@@ -184,8 +215,8 @@ function moveToDestination($destination, $blocker, $location) {
  * @return JSON string representation of the location.
  */
 function locationToJson($location) {
-    $x = $location ? $location->getX() : NULL;
-    $y = $location ? $location->getY() : NULL;
+    $x = $location ? $location->x : NULL;
+    $y = $location ? $location->y : NULL;
     $jsonArray = array('x' => $x, 'y' => $y);
     return json_encode($jsonArray);
 }
@@ -201,9 +232,12 @@ function partial_function() {
 }
 
 /**
- * HW 9: Halma AI v1.0
+ * HW 10: Halma AI v1.1
  */
 function getMove() {
+    // For now, hard code board settings
+    $boardSize = 9;
+
     $request = Slim::getInstance()->request();
 
     $board = json_decode($request->post("board"));
@@ -213,32 +247,72 @@ function getMove() {
     $pieces = decodePieces($board);
     $target = decodeDestination($upperLeftCell, $lowerRightCell);
 
-    $validMove = false;
-    while (!$validMove) {
-        $piece = getTopRightPiece($pieces);
-        $destination = getTopRightDestination($target);
-        $move = movePiece($piece, $destination);
+    $finishedMovePaths = array();
 
-        if ($piece->getX() === $move->getX() && $piece->getY() === $move->getY()) {
-            $piece->setDone(false);
-            $destination->setDone(true);
-        } else {
-            $validMove = true;
+    foreach ($pieces as $piece) {
+        $unfinishedMovePaths = array();
+        $initialPath = new Path($piece);
+        array_push($unfinishedMovePaths, $initialPath);
+
+        while (count($unfinishedMovePaths) > 0) {
+            $modifiedUnfinishedMovePaths = array();
+            foreach ($unfinishedMovePaths as $path) {
+                $lastCell = $path->getLastCell();
+                $previousCell = $path->getPreviousCell();
+
+                $possibleMoves = getPossibleSingleMovesFromPiece($lastCell, 
+                                                                 $pieces, 
+                                                                 $boardSize, 
+                                                                 $previousCell);
+                if (count($possibleMoves) == 0) {
+                    array_push($finishedMovePaths, $path);
+                } else {
+                    $newPaths = array();
+                    foreach ($possibleMoves as $move) {
+                        $pathCopy = clone $path;
+                        $pathCopy->addCell($move);
+                        if ($move->done) {
+                            array_push($finishedMovePaths, $pathCopy);
+                        } else {
+                            array_push($modifiedUnfinishedMovePaths, $pathCopy);
+                        }
+                    }
+
+                }
+            }
+            $unfinishedMovePaths = $modifiedUnfinishedMovePaths;
         }
     }
 
-    $moveList = array();
-    array_push($moveList, array('x' => $piece->getX(), 'y' => $piece->getY()));
-    array_push($moveList, array('x' => $move->getX(), 'y' => $move->getY()));
-    echo json_encode($moveList);
-}
+    $destination = new Cell(8, 0);
+    $path = getBestPath($finishedMovePaths);
 
-function movePiece($origin, $destination) {
-    $xDiff = $destination->getX() - $origin->getX();
-    $yDiff = $destination->getY() - $origin->getY();
-    $moveX = compare($xDiff, 0);
-    $moveY = compare($yDiff, 0);
-    return new Cell($origin->getX() + $moveX, $origin->getY() + $moveY);
+    $from = array('x' => $path->getFirstCell()->x, 'y' => $path->getFirstCell()->y);
+    $to = array();
+    for ($i = 1; $i < count($path->cells); $i++) {
+        $toMove = array('x' => $path->cells[$i]->x, 'y' => $path->cells[$i]->y);
+        array_push($to, $toMove);
+    }
+    $move = array('from' => $from, 'to' => $to);
+    echo json_encode($move);
+    // $validMove = false;
+    // while (!$validMove) {
+    //     $piece = getTopRightPiece($pieces);
+    //     $destination = getTopRightDestination($target);
+    //     $move = movePiece($piece, $destination);
+
+    //     if ($piece->getX() === $move->getX() && $piece->getY() === $move->getY()) {
+    //         $piece->setDone(false);
+    //         $destination->setDone(true);
+    //     } else {
+    //         $validMove = true;
+    //     }
+    // }
+
+    // $moveList = array();
+    // array_push($moveList, array('x' => $piece->getX(), 'y' => $piece->getY()));
+    // array_push($moveList, array('x' => $move->getX(), 'y' => $move->getY()));
+    // echo json_encode($moveList);
 }
 
 // Turn a JSON array of cells into an array of cell objects.
@@ -272,7 +346,7 @@ function decodeDestination($upperLeftCell, $lowerRightCell) {
 
 // Calculate the distance between two cells.
 function distanceBetweenCells($loc1, $loc2) {
-    return sqrt(pow($loc2->getX() - $loc1->getX(), 2) + pow($loc2->getY() - $loc1->getY(), 2));
+    return sqrt(pow($loc2->x - $loc1->x, 2) + pow($loc2->y - $loc1->y, 2));
 }
 
 // For a given list of pieces, return the top-right-most piece that isn't
@@ -284,7 +358,7 @@ function getTopRightPiece($cells) {
 
     foreach ($cells as $cell) {
         $distance = distanceBetweenCells($cell, $topRightCorner);
-        if ($distance < $minDistance && $cell->done()) {
+        if ($distance < $minDistance && $cell->done) {
             $minDistance = $distance;
             $topRightCell = $cell;
         }
@@ -301,7 +375,7 @@ function getTopRightDestination($cells) {
 
     foreach ($cells as $cell) {
         $distance = distanceBetweenCells($cell, $topRightCorner);
-        if ($distance < $minDistance && !$cell->done()) {
+        if ($distance < $minDistance && !$cell->done) {
             $minDistance = $distance;
             $topRightCell = $cell;
         }
@@ -310,4 +384,152 @@ function getTopRightDestination($cells) {
     return $topRightCell;
 }
 
+// Given a $movingPiece to move, return a list of all the possible Cells that
+// the $movingPiece can move to, either by jumping or not jumping.
+// $allPieces is a list of Cells with pieces, and $boardSize is the number
+// of rows/columns in the board (assumes a square board).
+// $previousLocation is the Cell that the $movingPiece had been in previously,
+// and is used to make sure the piece doesn't infinitely move back and forth.
+function getPossibleSingleMovesFromPiece($movingPiece, $allPieces, $boardSize, $previousCell = NULL) {
+    $possibleMoves = array();
+
+    // Look in 8 cells around $movingPiece, if it's empty and inside the board, 
+    // then add the cell to list of possible moves. Also check the cells that
+    // the piece can jump to.
+    for ($xDiff = -1; $xDiff <= 1; $xDiff++) {
+        for ($yDiff = -1; $yDiff <= 1; $yDiff++) {
+            // Don't check the cell the piece is currently occupying
+            if ($xDiff == 0 && $yDiff == 0) {
+                continue;
+            }
+
+            // Calculate the coordinates of the cell to check.
+            // $cell->done is true to indicate the end of the path.
+            $x = $movingPiece->x + $xDiff;
+            $y = $movingPiece->y + $yDiff;
+            $cell = new Cell($x, $y, true);
+
+            // If the $cell is not occupied by a piece and is inside of the
+            // board's boundaries, add the $cell to the $possibleMoves list.
+            // Otherwise, if the $cell is occupied, check the space that 
+            // can be reached by jumping. If this $jumpCell is empty, then add
+            // the $jumpCell to the list of $possibleMoves.
+            if (!isCellXYInList($cell, $allPieces) && 
+                isCellInsideBoard($cell, $boardSize) &&
+                !areCellsEqual($cell, $previousCell)) {
+                array_push($possibleMoves, $cell);
+            } else {
+                // Calculate the coordinates of the jump cell to check
+                // $cell->done is true to indicate not the end of the path.
+                $x = $movingPiece->x + $xDiff*2;
+                $y = $movingPiece->y + $yDiff*2;
+                $jumpCell = new Cell($x, $y, false);
+                
+                if (!isCellXYInList($jumpCell, $allPieces) && 
+                    isCellInsideBoard($jumpCell, $boardSize) &&
+                    !areCellsEqual($jumpCell, $previousCell)) {
+                    array_push($possibleMoves, $jumpCell);
+                }
+            }
+        }
+    }
+
+    return $possibleMoves;
+}
+
+// Return true if the given Cell's coordinates matches the coordinates of
+// a piece in the $pieceList. Otherwise, return false.
+function isCellXYInList($cell, $pieceList) {
+    foreach ($pieceList as $piece) {
+        if ($piece->x == $cell->x && $piece->y == $cell->y) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Return true if the Cell's (x, y) coordinates are inside the board boundaries.
+function isCellInsideBoard($cell, $boardSize) {
+    if (($cell->x >= 0 && $cell->x <= $boardSize-1) && 
+        ($cell->y >= 0 && $cell->y <= $boardSize-1)) {
+        return true;
+    }
+    return false;
+}
+
+// Return true if the (x, y) of $cellA matches the (x, y) of $cellB
+function areCellsEqual($cellA, $cellB) {
+    if ($cellA != NULL && $cellB != NULL) {
+        if ($cellA->x == $cellB->x && $cellA->y == $cellB->y) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function getBestPath($paths) {
+    // $maxDotProduct = -1;
+    // $bestPath = NULL;
+
+    // foreach ($paths as $path) {
+    //     $start = $path->getFirstCell();
+    //     $end = $path->getLastCell();
+    //     $ax = $end->x - $start->x;
+    //     $ay = $end->y - $start->y;
+    //     $dotProduct = calcDotProduct($ax, 7, $ay, 9);
+    //     if ($dotProduct > $maxDotProduct) {
+    //         $maxDotProduct = $dotProduct;
+    //         $bestPath = $path;
+    //     }
+    // }
+
+    // return $bestPath;
+
+
+    // $minDistance = PHP_INT_MAX;
+    // $bestPath = NULL;
+
+    // foreach ($paths as $path) {
+    //     $distance = distanceBetweenCells($path->getLastCell(), $destination);
+    //     if ($distance < $minDistance) {
+    //         $minDistance = $distance;
+    //         $bestPath = $path;
+    //     }
+    // }
+
+    // return $bestPath;
+
+
+    // $maxDistance = -1;
+    // $longestPath = NULL;
+    // foreach ($paths as $path) {
+    //     $pathDirection = $path->calcPathDirection();
+    //     if ($pathDirection >= 0 && $pathDirection <= 90) {
+    //         $pathDistance = $path->calcPathDistance();
+    //         if ($pathDistance > $maxDistance) {
+    //             $maxDistance = $pathDistance;
+    //             $longestPath = $path;
+    //         }
+    //     }
+    // }
+    // return $longestPath;
+
+
+    $maxDotProduct = -1;
+    $longestPath = NULL;
+    foreach ($paths as $path) {
+        $pathDistance = $path->calcPathDistance();
+        $pathDirection = $path->calcPathDirection();
+        $dotProduct = calcDotProduct($pathDistance, 12.73, abs($pathDirection - 45));
+        if ($dotProduct > $maxDotProduct) {
+            $maxDotProduct = $dotProduct;
+            $longestPath = $path;
+        }
+    }
+    return $longestPath;
+}
+
+function calcDotProduct($magA, $magB, $angle) {
+    return $magA * $magB * cos($angle);
+}
 ?>
