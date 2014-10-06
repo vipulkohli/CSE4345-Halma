@@ -16,12 +16,12 @@ $app->run();
 
 // Class to encapsulate X and Y coordinates
 class Cell {
-    public $x, $y, $done;
+    public $x, $y, $used;
 
-    function Cell($x = 0, $y = 0, $done = false) {
+    function Cell($x = 0, $y = 0, $used = false) {
         $this->x = $x;
         $this->y = $y;
-        $this->done = $done;
+        $this->used = $used;
     }
 }
 
@@ -247,45 +247,60 @@ function getMove() {
     $pieces = decodePieces($board);
     $target = decodeDestination($upperLeftCell, $lowerRightCell);
 
-    $finishedMovePaths = array();
-
-    foreach ($pieces as $piece) {
-        $unfinishedMovePaths = array();
-        $initialPath = new Path($piece);
-        array_push($unfinishedMovePaths, $initialPath);
-
-        while (count($unfinishedMovePaths) > 0) {
-            $modifiedUnfinishedMovePaths = array();
-            foreach ($unfinishedMovePaths as $path) {
-                $lastCell = $path->getLastCell();
-                $previousCell = $path->getPreviousCell();
-
-                $possibleMoves = getPossibleSingleMovesFromPiece($lastCell, 
-                                                                 $pieces, 
-                                                                 $boardSize, 
-                                                                 $previousCell);
-                if (count($possibleMoves) == 0) {
-                    array_push($finishedMovePaths, $path);
-                } else {
-                    $newPaths = array();
-                    foreach ($possibleMoves as $move) {
-                        $pathCopy = clone $path;
-                        $pathCopy->addCell($move);
-                        if ($move->done) {
-                            array_push($finishedMovePaths, $pathCopy);
-                        } else {
-                            array_push($modifiedUnfinishedMovePaths, $pathCopy);
-                        }
-                    }
-
-                }
+    // Pick a destination cell
+    for ($i = 0; $i < count($target); $i++) {
+        $destination = getTopRightDestination($target);
+        foreach ($pieces as &$piece) {
+            if (areCellsEqual($destination, $piece)) {
+                $piece->used = false;
+                $destination->used = true;
             }
-            $unfinishedMovePaths = $modifiedUnfinishedMovePaths;
+        }
+        if (!$destination->used) {
+            break;
         }
     }
 
-    $destination = new Cell(8, 0);
-    $path = getBestPath($finishedMovePaths);
+    $finishedMovePaths = array();
+
+    foreach ($pieces as &$piece) {
+        if ($piece->used) {
+            $unfinishedMovePaths = array();
+            $initialPath = new Path($piece);
+            array_push($unfinishedMovePaths, $initialPath);
+
+            while (count($unfinishedMovePaths) > 0) {
+                $modifiedUnfinishedMovePaths = array();
+                foreach ($unfinishedMovePaths as $path) {
+                    $lastCell = $path->getLastCell();
+                    $previousCell = $path->getPreviousCell();
+
+                    $possibleMoves = getPossibleSingleMovesFromPiece($lastCell, 
+                                                                     $pieces, 
+                                                                     $boardSize, 
+                                                                     $previousCell);
+                    if (count($possibleMoves) == 0) {
+                        array_push($finishedMovePaths, $path);
+                    } else {
+                        $newPaths = array();
+                        foreach ($possibleMoves as $move) {
+                            $pathCopy = clone $path;
+                            $pathCopy->addCell($move);
+                            if ($move->used) {
+                                array_push($finishedMovePaths, $pathCopy);
+                            } else {
+                                array_push($modifiedUnfinishedMovePaths, $pathCopy);
+                            }
+                        }
+
+                    }
+                }
+                $unfinishedMovePaths = $modifiedUnfinishedMovePaths;
+            }
+        }
+    }
+
+    $path = getBestPath($finishedMovePaths, $destination);
 
     $from = array('x' => $path->getFirstCell()->x, 'y' => $path->getFirstCell()->y);
     $to = array();
@@ -295,24 +310,6 @@ function getMove() {
     }
     $move = array('from' => $from, 'to' => $to);
     echo json_encode($move);
-    // $validMove = false;
-    // while (!$validMove) {
-    //     $piece = getTopRightPiece($pieces);
-    //     $destination = getTopRightDestination($target);
-    //     $move = movePiece($piece, $destination);
-
-    //     if ($piece->getX() === $move->getX() && $piece->getY() === $move->getY()) {
-    //         $piece->setDone(false);
-    //         $destination->setDone(true);
-    //     } else {
-    //         $validMove = true;
-    //     }
-    // }
-
-    // $moveList = array();
-    // array_push($moveList, array('x' => $piece->getX(), 'y' => $piece->getY()));
-    // array_push($moveList, array('x' => $move->getX(), 'y' => $move->getY()));
-    // echo json_encode($moveList);
 }
 
 // Turn a JSON array of cells into an array of cell objects.
@@ -358,7 +355,7 @@ function getTopRightPiece($cells) {
 
     foreach ($cells as $cell) {
         $distance = distanceBetweenCells($cell, $topRightCorner);
-        if ($distance < $minDistance && $cell->done) {
+        if ($distance < $minDistance && $cell->used) {
             $minDistance = $distance;
             $topRightCell = $cell;
         }
@@ -375,7 +372,7 @@ function getTopRightDestination($cells) {
 
     foreach ($cells as $cell) {
         $distance = distanceBetweenCells($cell, $topRightCorner);
-        if ($distance < $minDistance && !$cell->done) {
+        if ($distance < $minDistance && !$cell->used) {
             $minDistance = $distance;
             $topRightCell = $cell;
         }
@@ -404,7 +401,7 @@ function getPossibleSingleMovesFromPiece($movingPiece, $allPieces, $boardSize, $
             }
 
             // Calculate the coordinates of the cell to check.
-            // $cell->done is true to indicate the end of the path.
+            // $cell->used is true to indicate the end of the path.
             $x = $movingPiece->x + $xDiff;
             $y = $movingPiece->y + $yDiff;
             $cell = new Cell($x, $y, true);
@@ -420,7 +417,7 @@ function getPossibleSingleMovesFromPiece($movingPiece, $allPieces, $boardSize, $
                 array_push($possibleMoves, $cell);
             } else {
                 // Calculate the coordinates of the jump cell to check
-                // $cell->done is true to indicate not the end of the path.
+                // $cell->used is true to indicate not the end of the path.
                 $x = $movingPiece->x + $xDiff*2;
                 $y = $movingPiece->y + $yDiff*2;
                 $jumpCell = new Cell($x, $y, false);
@@ -467,69 +464,26 @@ function areCellsEqual($cellA, $cellB) {
     return false;
 }
 
-function getBestPath($paths) {
-    // $maxDotProduct = -1;
-    // $bestPath = NULL;
+function getBestPath($paths, $destination) {
+    $maxDistance = -1;
+    $bestPath = NULL;
 
-    // foreach ($paths as $path) {
-    //     $start = $path->getFirstCell();
-    //     $end = $path->getLastCell();
-    //     $ax = $end->x - $start->x;
-    //     $ay = $end->y - $start->y;
-    //     $dotProduct = calcDotProduct($ax, 7, $ay, 9);
-    //     if ($dotProduct > $maxDotProduct) {
-    //         $maxDotProduct = $dotProduct;
-    //         $bestPath = $path;
-    //     }
-    // }
-
-    // return $bestPath;
-
-
-    // $minDistance = PHP_INT_MAX;
-    // $bestPath = NULL;
-
-    // foreach ($paths as $path) {
-    //     $distance = distanceBetweenCells($path->getLastCell(), $destination);
-    //     if ($distance < $minDistance) {
-    //         $minDistance = $distance;
-    //         $bestPath = $path;
-    //     }
-    // }
-
-    // return $bestPath;
-
-
-    // $maxDistance = -1;
-    // $longestPath = NULL;
-    // foreach ($paths as $path) {
-    //     $pathDirection = $path->calcPathDirection();
-    //     if ($pathDirection >= 0 && $pathDirection <= 90) {
-    //         $pathDistance = $path->calcPathDistance();
-    //         if ($pathDistance > $maxDistance) {
-    //             $maxDistance = $pathDistance;
-    //             $longestPath = $path;
-    //         }
-    //     }
-    // }
-    // return $longestPath;
-
-
-    $maxDotProduct = -1;
-    $longestPath = NULL;
     foreach ($paths as $path) {
-        $pathDistance = $path->calcPathDistance();
-        $pathDirection = $path->calcPathDirection();
-        $dotProduct = calcDotProduct($pathDistance, 12.73, abs($pathDirection - 45));
-        if ($dotProduct > $maxDotProduct) {
-            $maxDotProduct = $dotProduct;
-            $longestPath = $path;
+        $pathLength = distanceBetweenCells($path->getFirstCell(), $path->getLastCell());
+        $distanceToDestination = distanceBetweenCells($path->getLastCell(), $destination);
+        if ($distanceToDestination != 0) {
+            $optimalDistance = $pathLength / $distanceToDestination;
+            if ($optimalDistance > $maxDistance) {
+                $maxDistance = $optimalDistance;
+                $bestPath = $path;
+            }
+        } else {
+            $maxDistance = PHP_INT_MAX;
+            $bestPath = $path;
         }
     }
-    return $longestPath;
+
+    return $bestPath;
 }
 
-function calcDotProduct($magA, $magB, $angle) {
-    return $magA * $magB * cos($angle);
-}
 ?>

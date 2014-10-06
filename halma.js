@@ -268,7 +268,7 @@ $(document).ready(function() {
                     "lowerRightCell": lowerRightCell },
             success: function(move) {
                 move = JSON.parse(move);
-                
+
                 for (var i = 0; i < gPieces.length; i++) {
                     if (gPieces[i].column === move.from.x && 
                         gPieces[i].row === move.from.y) {
