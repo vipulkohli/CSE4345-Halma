@@ -3,13 +3,6 @@
 require 'Slim/Slim.php';
 $app = new Slim();
 
-// http://yehj.floccul.us/halma/api/genJsonSumFromParms
-$app->get('/genJsonSumFromParms', 'genJsonSumFromParms');
-// http://yehj.floccul.us/halma/api/genJsonMoveFromParms
-$app->get('/genJsonMoveFromParms', 'genJsonMoveFromParms');
-// http://yehj.floccul.us/halma/api/genJsonMoveFromPixelParms/{pixelX}/{pixelY}
-$app->get('/genJsonMoveFromPixelParms/:pixelX/:pixelY', 'genJsonMoveFromPixelParms');
-
 $app->post('/getMove', 'getMove');
 
 $app->run();
@@ -25,6 +18,7 @@ class Cell {
     }
 }
 
+// Class to encapsulate the list of points in a path, and helper functions
 class Path {
     public $cells = array();
 
@@ -51,40 +45,6 @@ class Path {
     function addCell($cell) {
         array_push($this->cells, $cell);
     }
-
-    function calcPathDistance() {
-        return distanceBetweenCells($this->getFirstCell(), $this->getLastCell());
-    }
-
-    function calcPathDirection() {
-        $start = $this->getFirstCell();
-        $end = $this->getLastCell();
-        $dy = $end->y - $start->y;
-        $dx = $end->x - $start->x;
-        if ($dx == 0) {
-            if ($dy >= 0) {
-                return 90;
-            } else {
-                return -90;
-            }
-        }
-        return atan($dy/$dx);
-    }
-}
-
-/**
- * @param $x HTTP GET parameter for X coordinate (string)
- * @param $y HTTP GET parameter for Y coordinate (string)
- * @return Cell
- */
-function getCell($x, $y) {
-    // Get the Slim request object
-    $request = Slim::getInstance()->request();
-
-    // Create a Cell object and store X and Y in it
-    $cell = new Cell($request->get($x), $request->get($y));
-
-    return $cell;
 }
 
 /**
@@ -93,142 +53,6 @@ function getCell($x, $y) {
  */
 function compare($a, $b) {
     return ($a == $b) ? 0 : (($a > $b) ? 1 : -1);
-}
-
-/**
- * HW 3 Part A
- */
-function genJsonSumFromParms() {
-    // (px, py) = coordinates of Halma piece to move
-    $p = getCell('px', 'py');
-    // (dx, dy) = desired destination of the Halma piece
-    $d = getCell('dx', 'dy');
-    // (bx, by) = cell of another piece on the board (not to be moved)
-    $b = getCell('bx', 'by');
-
-    // Calculate sums of x's and y's
-    $sumx = $p->x + $d->x + $b->x;
-    $sumy = $p->y + $d->y + $b->y;
-
-    // Show answer as a JSON string
-    $answer = array('sumx' => $sumx, 'sumy' => $sumy);
-    echo json_encode($answer);
-}
-
-/**
- * HW 3 Part B
- */
-function genJsonMoveFromParms() {
-    // (px, py) = coordinates of Halma piece to move
-    $p = getCell('px', 'py');
-    // (dx, dy) = desired destination of the Halma piece
-    $d = getCell('dx', 'dy');
-    // (bx, by) = cell of another piece on the board (not to be moved)
-    $b = getCell('bx', 'by');
-
-    // Calculate the difference between the X's and Y's of the
-    // destination and piece coordinates, and use that to determine
-    // the new X and Y coordinates.
-    $xDiff = $d->x - $p->x;
-    $yDiff = $d->y - $p->y;
-    $moveX = compare($xDiff, 0);
-    $moveY = compare($yDiff, 0);
-    $newP = new Cell($p->x + $moveX, $p->y + $moveY);
-
-    // Check if the new X and Y are on top of the blocking piece.
-    // If so, jump over it.
-    if ($newP == $b) {
-        $newP = new Cell($newP->x + $moveX, $newP->y + $moveY);
-    }
-
-    // Show answer as a JSON string
-    $answer = array('x' => $newP->x, 'y' => $newP->y);
-    echo json_encode($answer);
-}
-
-/**
- * HW 4 & 5: Functional Programming Style
- */
-function genJsonMoveFromPixelParms($pixelX, $pixelY) {
-    $numRows = 9;
-    $numCols = 9;
-    $cellPxSize = 50;
-    $destination = new Cell(6, 2);
-    $blocker = new Cell(4, 4);
-
-    // define partial functions and pass in 'global' variables
-    $convertPxToLoc = partial_function('convertPxToLoc', $numRows, $numCols, $cellPxSize);
-    $moveToDestination = partial_function('moveToDestination', $destination, $blocker);
-
-    echo locationToJson($moveToDestination($convertPxToLoc($pixelX, $pixelY)));
-}
-
-/**
- * Convert the pixel coordinates to the cell location on the game board
- * @param $numRows The number of rows in the game board
- * @param $numCols The number of columns in the game board
- * @param $cellPxSize The pixel width/height of a cell in the game board
- * @param $pixelX Pixel X coordinate of where the user clicked on the board
- * @param $pixelY Pixel Y coordinate of where the user clicked on the board
- * @return Cell location. NULL if bad parameters.
- */
-function convertPxToLoc($numRows, $numCols, $cellPxSize, $pixelX, $pixelY) {
-    try {
-        $x = ceil($pixelX / $cellPxSize);
-        $y = ceil($pixelY / $cellPxSize);
-        if (($x < 0 || $x > $numCols - 1) || ($y < 0 || $y > $numRows - 1)) {
-            throw new Exception('Location out of bounds.');
-        }
-        return new Cell($x, $y);
-    } catch (Exception $e) {
-        return NULL;
-    }
-}
-
-/**
- * Move the game piece towards the destination.
- * @param $destination X and Y coordinates of the destination location.
- * @param $destination X and Y coordinates of the destination location.
- * @param $location X and Y coordinates of the piece's current location.
- * @return New cell location.
- */
-function moveToDestination($destination, $blocker, $location) {
-    if (!$location || !$destination || !$blocker) {
-        return NULL;
-    }
-    $xDiff = $destination->x - $location->x;
-    $yDiff = $destination->y - $location->y;
-    $moveX = compare($xDiff, 0);
-    $moveY = compare($yDiff, 0);
-    $newLocation = new Cell($location->x + $moveX, 
-                                $location->y + $moveY);
-    if ($newLocation == $blocker) {
-        $newLocation = new Cell($newLocation->x + $moveX, 
-                                    $newLocation->y + $moveY);
-    }
-    return $newLocation;
-}
-
-/**
- * Convert the location to a JSON string.
- * @param $location X and Y coordinates of a location.
- * @return JSON string representation of the location.
- */
-function locationToJson($location) {
-    $x = $location ? $location->x : NULL;
-    $y = $location ? $location->y : NULL;
-    $jsonArray = array('x' => $x, 'y' => $y);
-    return json_encode($jsonArray);
-}
-
-/**
- * https://gist.github.com/jdp/2201912#file-partial_function-php
- */
-function partial_function() {
-    $applied_args = func_get_args();
-    return function() use($applied_args) {
-        return call_user_func_array('call_user_func', array_merge($applied_args, func_get_args()));
-    };
 }
 
 /**
@@ -346,24 +170,6 @@ function distanceBetweenCells($loc1, $loc2) {
     return sqrt(pow($loc2->x - $loc1->x, 2) + pow($loc2->y - $loc1->y, 2));
 }
 
-// For a given list of pieces, return the top-right-most piece that isn't
-// already in the destination.
-function getTopRightPiece($cells) {
-    $topRightCorner = new Cell(8, 0);
-    $minDistance = PHP_INT_MAX;
-    $topRightCell = NULL;
-
-    foreach ($cells as $cell) {
-        $distance = distanceBetweenCells($cell, $topRightCorner);
-        if ($distance < $minDistance && $cell->used) {
-            $minDistance = $distance;
-            $topRightCell = $cell;
-        }
-    }
-
-    return $topRightCell;
-}
-
 // For a given list of destination cells, return the top-right-most empty cell.
 function getTopRightDestination($cells) {
     $topRightCorner = new Cell(8, 0);
@@ -464,6 +270,7 @@ function areCellsEqual($cellA, $cellB) {
     return false;
 }
 
+// Return the best path out of the list of paths to reach the destination
 function getBestPath($paths, $destination) {
     $maxDistance = -1;
     $bestPath = NULL;
