@@ -59,14 +59,13 @@ function compare($a, $b) {
  * HW 10: Halma AI v1.1
  */
 function getMove() {
-    $request = Slim::getInstance()->request();
-
-    $board = json_decode($request->getBody());
+    // Parse the JSON input
+    $board = json_decode(Slim::getInstance()->request()->getBody());
     $boardSize = $board->boardSize;
     $pieces = decodePieces($board->pieces, true);
     $target = decodePieces($board->destinations, false);
 
-    // Pick a destination cell
+    // Pick a destination cell from the target area
     for ($i = 0; $i < count($target); $i++) {
         $destination = getTopRightDestination($target);
         foreach ($pieces as &$piece) {
@@ -82,45 +81,63 @@ function getMove() {
 
     $finishedMovePaths = array();
 
+    // Compile a list of every possible move path
     foreach ($pieces as &$piece) {
+        // Only consider pieces that still need to reach destination
         if ($piece->used) {
+            // Start the path with the chosen piece's location
             $unfinishedMovePaths = array();
             $initialPath = new Path($piece);
             array_push($unfinishedMovePaths, $initialPath);
 
+            // Iterate until all the paths have an endpoint
             while (count($unfinishedMovePaths) > 0) {
+                // Array for compiling an updated list of paths without endpoints
                 $modifiedUnfinishedMovePaths = array();
+
+                // Get each unfinished path one step closer to finished
                 foreach ($unfinishedMovePaths as $path) {
+                    // Get the last two points in the path
                     $lastCell = $path->getLastCell();
                     $previousCell = $path->getPreviousCell();
 
+                    // Generate a list of cells that can be reached from the
+                    // the last cell in the path
                     $possibleMoves = getPossibleSingleMovesFromPiece($lastCell, 
                                                                      $pieces, 
                                                                      $boardSize, 
                                                                      $previousCell);
+
+                    // If there are no possible moves, mark the path as finished.
+                    // Otherwise, append the possible moves to the current path.
                     if (count($possibleMoves) == 0) {
                         array_push($finishedMovePaths, $path);
                     } else {
-                        $newPaths = array();
+                        // Make a new path option for each possible move
                         foreach ($possibleMoves as $move) {
                             $pathCopy = clone $path;
+                            // Add the move to the path
                             $pathCopy->addCell($move);
+                            // If the move is the endpoint, mark path as finished
                             if ($move->used) {
                                 array_push($finishedMovePaths, $pathCopy);
                             } else {
                                 array_push($modifiedUnfinishedMovePaths, $pathCopy);
                             }
                         }
-
                     }
                 }
+
                 $unfinishedMovePaths = $modifiedUnfinishedMovePaths;
             }
         }
     }
 
+    // Determine the best move to make
     $path = getBestPath($finishedMovePaths, $destination);
 
+    // Print out the chosen best move as JSON in the format:
+    // {"from": {"x": 22, "y": 30}, "to": [{"x": 24, "y": 30}, {"x": 26, "y": 30}]}
     $from = array('x' => $path->getFirstCell()->x, 'y' => $path->getFirstCell()->y);
     $to = array();
     for ($i = 1; $i < count($path->cells); $i++) {
