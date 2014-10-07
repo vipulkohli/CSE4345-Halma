@@ -59,17 +59,12 @@ function compare($a, $b) {
  * HW 10: Halma AI v1.1
  */
 function getMove() {
-    // For now, hard code board settings
-    $boardSize = 9;
-
     $request = Slim::getInstance()->request();
 
-    $board = json_decode($request->post("board"));
-    $upperLeftCell = json_decode($request->post("upperLeftCell"));
-    $lowerRightCell = json_decode($request->post("lowerRightCell"));
-
-    $pieces = decodePieces($board);
-    $target = decodeDestination($upperLeftCell, $lowerRightCell);
+    $board = json_decode($request->getBody());
+    $boardSize = $board->boardSize;
+    $pieces = decodePieces($board->pieces, true);
+    $target = decodePieces($board->destinations, false);
 
     // Pick a destination cell
     for ($i = 0; $i < count($target); $i++) {
@@ -137,29 +132,11 @@ function getMove() {
 }
 
 // Turn a JSON array of cells into an array of cell objects.
-function decodePieces($jsonCells) {
+function decodePieces($jsonCells, $used = true) {
     $arrayCells = array();
 
     foreach ($jsonCells as $jsonCell) {
-        array_push($arrayCells, new Cell($jsonCell->x, $jsonCell->y, true));
-    }
-
-    return $arrayCells;
-}
-
-// Given JSON objects with (x, y) coordinates for upper left and lower right
-// destination target area, convert it to an array of cells.
-function decodeDestination($upperLeftCell, $lowerRightCell) {
-    $arrayCells = array();
-
-    $width = $lowerRightCell->x - $upperLeftCell->x;
-    $height = $lowerRightCell->y - $upperLeftCell->y;
-    for ($i = 0; $i <= $width; $i++) {
-        for ($j = 0; $j <= $height; $j++) {
-            $x = $upperLeftCell->x + $i;
-            $y = $upperLeftCell->y + $j;
-            array_push($arrayCells, new Cell($x, $y));
-        }
+        array_push($arrayCells, new Cell($jsonCell->x, $jsonCell->y, $used));
     }
 
     return $arrayCells;
