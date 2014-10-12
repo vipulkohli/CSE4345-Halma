@@ -120,6 +120,23 @@ function getMove() {
 }
 
 /**
+ * Turn a JSON array of cells into an array of cell objects.
+ * @param JSONObject[] $jsonCells An array of JSON objects with coordinates.
+ * @param bool $used Whether to mark each of the Cells as "used".
+ * @return Cell[]
+ */
+function decodePieces($jsonCells, $used = true) {
+    $arrayCells = array();
+
+    // Create a Cell object for each cell in the JSON array
+    foreach ($jsonCells as $jsonCell) {
+        array_push($arrayCells, new Cell($jsonCell->x, $jsonCell->y, $used));
+    }
+
+    return $arrayCells;
+}
+
+/**
  * From a list of all the cells in the destination area, pick one cell.
  * @param Cell[] $destinationArea The list of cells in the destination area.
  * @param Cell[] $pieces The list of all the pieces on the board.
@@ -218,33 +235,6 @@ function generatePossiblePaths($pieces, $boardSize) {
 }
 
 /**
- * Turn a JSON array of cells into an array of cell objects.
- * @param JSONObject[] $jsonCells An array of JSON objects with coordinates.
- * @param bool $used Whether to mark each of the Cells as "used".
- * @return Cell[]
- */
-function decodePieces($jsonCells, $used = true) {
-    $arrayCells = array();
-
-    // Create a Cell object for each cell in the JSON array
-    foreach ($jsonCells as $jsonCell) {
-        array_push($arrayCells, new Cell($jsonCell->x, $jsonCell->y, $used));
-    }
-
-    return $arrayCells;
-}
-
-/**
- * Calculate the distance between two cells.
- * @param Cell $loc1 One point in the distance calculation.
- * @param Cell $loc2 The other point in the distance calculation.
- * @return float The distance between $loc1 and $loc2.
- */
-function distanceBetweenCells($loc1, $loc2) {
-    return sqrt(pow($loc2->x - $loc1->x, 2) + pow($loc2->y - $loc1->y, 2));
-}
-
-/**
  * For a given list of destination cells, return the top-right-most empty cell.
  * @param Cell[] $cells The array of destination cells.
  * @param int $boardSize The number of rows/columns in the game board.
@@ -265,6 +255,16 @@ function getTopRightDestination($cells, $boardSize) {
     }
 
     return $topRightCell;
+}
+
+/**
+ * Calculate the distance between two cells.
+ * @param Cell $loc1 One point in the distance calculation.
+ * @param Cell $loc2 The other point in the distance calculation.
+ * @return float The distance between $loc1 and $loc2.
+ */
+function distanceBetweenCells($loc1, $loc2) {
+    return sqrt(pow($loc2->x - $loc1->x, 2) + pow($loc2->y - $loc1->y, 2));
 }
 
 /**
@@ -401,16 +401,6 @@ function getBestPath($paths, $destination) {
     }
 
     return $bestPath;
-}
-
-/**
- * Compares two numbers, $a and $b.
- * @param float $a The left-hand-side number to compare.
- * @param float $b The right-hand-side number to compare.
- * @return bool if $a > $b, return 1; if $a < $b, return -1; if $a = $b, return 0
- */
-function compare($a, $b) {
-    return ($a == $b) ? 0 : (($a > $b) ? 1 : -1);
 }
 
 ?>
