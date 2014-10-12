@@ -109,12 +109,12 @@ function getMove() {
     $pieces = decodePieces($board->pieces, true);
     $destinations = decodePieces($board->destinations, false);
 
+    // Pick a destination cell from the target area
+    $destination = pickDestinationCell($destinations, $pieces, $boardSize);
+
     // Compile a list of every possible move path
     $paths = generatePossiblePaths($pieces, $boardSize);
 
-    // Pick a destination cell from the target area
-    $destination = pickDestinationCell($destinations, $pieces, $boardSize);
-    
     // Determine the best move to make and print it out
     echo getBestPath($paths, $destination);
 }
@@ -266,7 +266,6 @@ function getTopRightDestination($cells, $boardSize) {
 
     return $topRightCell;
 }
-
 
 /**
  * Given a $movingPiece to move, return a list of all the possible Cells that
