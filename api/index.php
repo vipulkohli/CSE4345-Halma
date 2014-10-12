@@ -78,34 +78,60 @@ class Path {
     function addCell($cell) {
         array_push($this->cells, $cell);
     }
+
+    /**
+     * Returns a JSON version of the path.
+     * @return string JSON string with a "from" and "to"
+     */
+    function __toString() {
+        // Setup the arrays to hold "from" and "to" info    
+        $from = array('x' => $this->getFirstCell()->x, 'y' => $this->getFirstCell()->y);
+        $to = array();
+
+        // Add path points to the "to" array
+        for ($i = 1; $i < count($this->cells); $i++) {
+            $toMove = array('x' => $this->cells[$i]->x, 'y' => $this->cells[$i]->y);
+            array_push($to, $toMove);
+        }
+
+        return json_encode(array('from' => $from, 'to' => $to));
+    }
 }
 
 /**
- * Compares two numbers, $a and $b.
- * @param float $a The left-hand-side number to compare.
- * @param float $b The right-hand-side number to compare.
- * @return bool if $a > $b, return 1; if $a < $b, return -1; if $a = $b, return 0
- */
-function compare($a, $b) {
-    return ($a == $b) ? 0 : (($a > $b) ? 1 : -1);
-}
-
-/**
- * Given JSON post data with the Halma game board info, return a JSON string
+ * Given JSON post data with the Halma game board info, print a JSON string
  * with info on the best move to make.
- * @return string A JSON string with the best move in the format:
- * {"from": {"x": 22, "y": 30}, "to": [{"x": 24, "y": 30}, {"x": 26, "y": 30}]}
  */
 function getMove() {
     // Parse the JSON input
     $board = json_decode(Slim::getInstance()->request()->getBody());
     $boardSize = $board->boardSize;
     $pieces = decodePieces($board->pieces, true);
-    $target = decodePieces($board->destinations, false);
+    $destinations = decodePieces($board->destinations, false);
+
+    // Compile a list of every possible move path
+    $paths = generatePossiblePaths($pieces, $boardSize);
 
     // Pick a destination cell from the target area
-    for ($i = 0; $i < count($target); $i++) {
-        $destination = getTopRightDestination($target);
+    $destination = pickDestinationCell($destinations, $pieces, $boardSize);
+    
+    // Determine the best move to make and print it out
+    echo getBestPath($paths, $destination);
+}
+
+/**
+ * From a list of all the cells in the destination area, pick one cell.
+ * @param Cell[] $destinationArea The list of cells in the destination area.
+ * @param Cell[] $pieces The list of all the pieces on the board.
+ * @param int $boardSize The number of rows/columns in the game board.
+ * @return Cell
+ */
+function pickDestinationCell($destinationArea, $pieces, $boardSize) {
+    $destination = NULL;
+
+    // Pick a destination cell from the destination area
+    for ($i = 0; $i < count($destinationArea); $i++) {
+        $destination = getTopRightDestination($destinationArea, $boardSize);
 
         // If a piece is in the destination cell, set some flags to mark as used
         foreach ($pieces as &$piece) {
@@ -121,6 +147,19 @@ function getMove() {
         }
     }
 
+    return $destination;
+}
+
+/**
+ * For each of the pieces on the board, generate all the possible paths that the
+ * piece can make from its current location. Compiles all of the possible paths 
+ * for each piece into one array.
+ * 
+ * @param Cell[] $pieces The list of all the pieces on the board.
+ * @param int $boardSize The number of rows/columns in the game board.
+ * @return Path[]
+ */
+function generatePossiblePaths($pieces, $boardSize) {
     $finishedMovePaths = array();
 
     // Compile a list of every possible move path
@@ -175,21 +214,7 @@ function getMove() {
         }
     }
 
-    // Determine the best move to make
-    $path = getBestPath($finishedMovePaths, $destination);
-
-    // Setup the arrays to hold "from" and "to" info    
-    $from = array('x' => $path->getFirstCell()->x, 'y' => $path->getFirstCell()->y);
-    $to = array();
-
-    // Add path points to the "to" array
-    for ($i = 1; $i < count($path->cells); $i++) {
-        $toMove = array('x' => $path->cells[$i]->x, 'y' => $path->cells[$i]->y);
-        array_push($to, $toMove);
-    }
-
-    // Print out the chosen best move as JSON
-    echo json_encode(array('from' => $from, 'to' => $to));
+    return $finishedMovePaths;
 }
 
 /**
@@ -222,11 +247,11 @@ function distanceBetweenCells($loc1, $loc2) {
 /**
  * For a given list of destination cells, return the top-right-most empty cell.
  * @param Cell[] $cells The array of destination cells.
+ * @param int $boardSize The number of rows/columns in the game board.
  * @return Cell The top-right-most empty (used is false) cell.
  */
-function getTopRightDestination($cells) {
-    // TODO: fix this to not be hard coded
-    $topRightCorner = new Cell(8, 0);
+function getTopRightDestination($cells, $boardSize) {
+    $topRightCorner = new Cell($boardSize - 1, 0);
     $minDistance = PHP_INT_MAX;
     $topRightCell = NULL;
 
@@ -377,6 +402,16 @@ function getBestPath($paths, $destination) {
     }
 
     return $bestPath;
+}
+
+/**
+ * Compares two numbers, $a and $b.
+ * @param float $a The left-hand-side number to compare.
+ * @param float $b The right-hand-side number to compare.
+ * @return bool if $a > $b, return 1; if $a < $b, return -1; if $a = $b, return 0
+ */
+function compare($a, $b) {
+    return ($a == $b) ? 0 : (($a > $b) ? 1 : -1);
 }
 
 ?>
