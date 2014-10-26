@@ -1,11 +1,12 @@
 <?php 
 // Jessica Yeh
-// http://lyle.smu.edu/~jyeh/4345/api/index.php/getMove
+// http://lyle.smu.edu/~jyeh/4345/api/index.php/getMultiplayerMove
 
 // Uses the Slim PHP REST Framework: http://slimframework.com/
 require 'Slim/Slim.php';
 $app = new Slim();
 $app->post('/getMove', 'getMove');
+$app->post('/getMultiplayerMove', 'getMultiplayerMove');
 $app->run();
 
 /**
@@ -120,6 +121,29 @@ function getMove() {
 }
 
 /**
+ * Given JSON post data with the Halma game board info, print a JSON string
+ * with info on the best move to make.
+ */
+function getMultiplayerMove() {
+    // Parse the JSON input
+    $board = json_decode(Slim::getInstance()->request()->getBody());
+    $boardSize = $board->boardSize;
+    $pieces = decodePieces($board->pieces, true);
+    $enemyPieces = decodePieces($board->enemy, false);
+    $allPieces = array_merge($pieces, $enemyPieces);
+    $destinations = decodePieces($board->destinations, false);
+
+    // Pick a destination cell from the target area
+    $destination = pickDestinationCell($destinations, $pieces, $boardSize);
+
+    // Compile a list of every possible move path
+    $paths = generatePossiblePaths($allPieces, $boardSize);
+
+    // Determine the best move to make and print it out
+    echo getBestPath($paths, $destination);
+}
+
+/**
  * Turn a JSON array of cells into an array of cell objects.
  * @param JSONObject[] $jsonCells An array of JSON objects with coordinates.
  * @param bool $used Whether to mark each of the Cells as "used".
@@ -148,7 +172,14 @@ function pickDestinationCell($destinationArea, $pieces, $boardSize) {
 
     // Pick a destination cell from the destination area
     for ($i = 0; $i < count($destinationArea); $i++) {
-        $destination = getTopRightDestination($destinationArea, $boardSize);
+        // Check if the destination area is on the left or right side of the
+        // game board, and choose the destination cell accordingly.
+        if ($destinationArea[0]->x < $boardSize/2) {
+            $reference = new Cell(0, 0);
+        } else {
+            $reference = new Cell($boardSize - 1, 0);
+        }
+        $destination = getNearestUnusedCell($destinationArea, $reference);
 
         // If a piece is in the destination cell, set some flags to mark as used
         foreach ($pieces as &$piece) {
@@ -255,6 +286,29 @@ function getTopRightDestination($cells, $boardSize) {
     }
 
     return $topRightCell;
+}
+
+/**
+ * For a given list of destination cells, return the empty cell closest to the
+ * given reference cell.
+ * @param Cell[] $cells The array of destination cells.
+ * @param Cell $reference The reference cell.
+ * @return Cell The top-right-most empty (used is false) cell.
+ */
+function getNearestUnusedCell($cells, $reference) {
+    $minDistance = PHP_INT_MAX;
+    $closestCell = NULL;
+
+    // Determine the Cell that is closest to the top-right corner
+    foreach ($cells as $cell) {
+        $distance = distanceBetweenCells($cell, $reference);
+        if ($distance < $minDistance && !$cell->used) {
+            $minDistance = $distance;
+            $closestCell = $cell;
+        }
+    }
+
+    return $closestCell;
 }
 
 /**
